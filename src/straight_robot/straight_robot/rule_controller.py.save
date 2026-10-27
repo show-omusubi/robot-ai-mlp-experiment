@@ -1,0 +1,166 @@
+
+
+import math
+import time
+
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Twist
+
+
+STRAIGHT = 0
+LEFT = 1
+RIGHT = 2
+
+
+class RuleController(Node):
+
+    def __init__(self):
+        super().__init__('rule_controller')
+
+        self.cmd_pub = self.create_publisher(
+            Twist,
+            '/cmd_vel',
+            10
+        )
+
+        self.subscription = self.create_subscription(
+            LaserScan,
+            '/front_range',
+            self.scan_callback,
+            10
+        )
+
+        # 最後に行った旋回方向
+        self.last_turn = RIGHT
+
+        # センサ判定しきい値
+        self.threshold = 4.5
+
+        # 動作速度
+        self.linear_speed = 0.30
+        self.angular_speed = 0.80
+
+        # 1回の動作時間
+        self.forward_time = 0.30
+        self.turn_time = 0.20
+
+        # センサ受信のたびに連続動作しすぎないため
+        self.busy = False
+
+        self.get_logger().info(
+            'Rule controller started'
+        )
+
+    def publish_velocity(self, linear, angular):
+        msg = Twist()
+        msg.linear.x = linear
+        msg.angular.z = angular
+        self.cmd_pub.publish(msg)
+
+    def stop(self):
+        self.publish_velocity(0.0, 0.0)
+
+    def move_straight(self):
+        self.get_logger().info('ACTION = STRAIGHT')
+
+        self.publish_velocity(
+            self.linear_speed,
+            0.0
+        )
+
+        time.sleep(self.forward_time)
+        self.stop()
+
+    def turn_left(self):
+        self.get_logger().info('ACTION = LEFT')
+
+        self.publish_velocity(
+            0.0,
+            self.angular_speed
+        )
+
+        time.sleep(self.turn_time)
+        self.stop()
+
+        self.last_turn = LEFT
+
+    def turn_right(self):
+        self.get_logger().info('ACTION = RIGHT')
+
+        self.publish_velocity(
+            0.0,
+            -self.angular_speed
+        )
+
+        time.sleep(self.turn_time)
+        self.stop()
+
+        self.last_turn = RIGHT
+
+    def scan_callback(self, msg):
+
+        if self.busy:
+            return
+
+        if len(msg.ranges) == 0:
+            return
+
+        distance = msg.ranges[0]
+
+        if math.isinf(distance) or math.isnan(distance):
+            reflection = 0
+        elif distance < self.threshold:
+            reflection = 1
+        else:
+            reflection = 0
+
+        self.get_logger().info(
+            f'distance={distance:.3f}, '
+            f'reflection={reflection}, '
+            f'last_turn={self.last_turn}'
+        )
+
+        self.busy = True
+
+        try:
+            # 中央を向いている
+            if reflection == 1:
+                self.move_straight()
+
+            # 中央から外れた
+            else:
+
+                # 最後が右旋回なら左へ戻す
+                if self.last_turn == RIGHT:
+                    self.turn_left()
+
+                # 最後が左旋回なら右へ戻す
+                else:
+                    self.turn_right()
+
+        finally:
+            self.busy = False
+
+
+def main(args=None):
+
+    rclpy.init(args=args)
+
+    node = RuleController()
+
+    try:
+        rclpy.spin(node)
+
+    except KeyboardInterrupt:
+        pass
+
+    finally:
+        node.stop()
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

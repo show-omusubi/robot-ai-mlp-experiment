@@ -1,0 +1,8 @@
+build/
+install/
+log/
+mlp_venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.vscode/

@@ -1,0 +1,5 @@
+missing_state,mean_validation_accuracy,std_validation_accuracy,min_validation_accuracy,max_validation_accuracy,perfect_count,perfect_rate
+R0_LEFT,0.75,0.0,0.75,0.75,0,0.0
+R0_RIGHT,0.75,0.0,0.75,0.75,0,0.0
+R1_LEFT,0.7875000238418579,0.08926785737276077,0.75,1.0,3,0.15
+R1_RIGHT,0.7749999761581421,0.07500000298023224,0.75,1.0,2,0.1
